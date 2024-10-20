@@ -1,7 +1,12 @@
 import os
-import tempfile
 import streamlit as st
 from video_process import final  # This is your `final` function
+
+def remove_temp_files(files):
+    """Helper function to remove temporary files."""
+    for file in files:
+        if os.path.exists(file):
+            os.remove(file)
 
 if __name__ == "__main__":
     st.title("YouTube Shorts Extractor Web App from Long Videos")
@@ -19,16 +24,11 @@ if __name__ == "__main__":
                     temp_file.write(uploaded_file.read())
 
                 try:
+                    # Run the processing function
                     final(temp_file_path)
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
-                    # Clean up temporary files
-                    if os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
-                    if os.path.exists("output_audio.wav"):
-                        os.remove("output_audio.wav")
-                    if os.path.exists("transcript.txt"):
-                        os.remove("transcript.txt")
+                    remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
                     st.stop()
 
                 # Create an output folder if it doesn't exist
@@ -36,25 +36,29 @@ if __name__ == "__main__":
                 if not os.path.exists(output_folder):
                     os.makedirs(output_folder)
 
+                # Fetch output files (processed clips)
                 output_files = [f for f in os.listdir(output_folder) if os.path.isfile(os.path.join(output_folder, f))]
 
                 st.info("Here are the processed video clips:")
 
-                # Display the processed video clips in a grid format
-                num_columns = 3  # Number of columns in the grid
-                columns = st.columns(num_columns)
+                # Display download buttons for each processed video
+                for output_file in output_files:
+                    file_path = os.path.join(output_folder, output_file)
 
-                for i, output_file in enumerate(output_files):
-                    with columns[i % num_columns]:
-                        st.video(os.path.join(output_folder, output_file))
-                        os.remove(os.path.join(output_folder, output_file))
+                    st.video(file_path)
+
+                    # Create a download button for each video clip
+                    with open(file_path, "rb") as video_file:
+                        st.download_button(
+                            label=f"Download {output_file}",
+                            data=video_file,
+                            file_name=output_file,
+                            mime="video/mp4"
+                        )
 
                 st.success("Processing complete!")
 
             # Remove temporary files after processing
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            if os.path.exists("output_audio.wav"):
-                os.remove("output_audio.wav")
-            if os.path.exists("transcript.txt"):
-                os.remove("transcript.txt")
+            remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
+            # Optionally, remove processed files if they are no longer needed after download
+            remove_temp_files([os.path.join(output_folder, file) for file in output_files])
