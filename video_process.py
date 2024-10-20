@@ -14,7 +14,6 @@ model_name = "en_core_web_lg"
 
 # Function to load the spaCy model
 def load_spacy_model():
-    model_name = "en_core_web_lg"
     try:
         nlp = spacy.load(model_name)
     except OSError:
@@ -103,7 +102,7 @@ def final(video_path):
                         "text": prompt
                     }
                 ]
-            ]
+            }
         )
         summary = transcript.text[:100] + response.text.replace("*", "").replace("-", "")
 
@@ -187,3 +186,4 @@ def final(video_path):
         trim_and_speedup_video(video_path, output_folder, start_time, end_time)
 
     st.write("All video clips trimmed and sped up successfully!")
+
