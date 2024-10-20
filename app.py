@@ -2,6 +2,15 @@ import streamlit as st
 import os
 from video_process import final
 
+import spacy
+import os
+
+model_name = "en_core_web_lg"
+try:
+    nlp = spacy.load(model_name)
+except OSError:
+    os.system(f"python -m spacy download {model_name}")
+    nlp = spacy.load(model_name)
 
 
 if __name__ == "__main__":
