@@ -16,16 +16,15 @@ model_name = "en_core_web_lg"
 def load_spacy_model():
     model_name = "en_core_web_lg"
     try:
-        nlp = spacy.load(model_name)  # Try loading the model
+        nlp = spacy.load(model_name)
     except OSError:
-        # If the model is not found, download it
-        spacy.cli.download(model_name)  # No need for 'target' argument
-        nlp = spacy.load(model_name)  # Load the model after installation
+        # Download the model if not available
+        spacy.cli.download(model_name)
+        nlp = spacy.load(model_name)
     return nlp
 
 # Load the spaCy model
 nlp = load_spacy_model()
-
 
 # Access API keys from Streamlit secrets
 GOOGLE_API_KEY = st.secrets["google_api"]["api_key"]
@@ -36,7 +35,6 @@ def final(video_path):
     # Configure Google Generative AI
     genai.configure(api_key=GOOGLE_API_KEY)
 
-    # Create the model
     generation_config = {
         "temperature": 1,
         "top_p": 0.95,
@@ -54,17 +52,16 @@ def final(video_path):
         # Process the video to extract audio
         video_clip = VideoFileClip(video_path)
         audio_clip = video_clip.audio
-        audio_clip.write_audiofile("output_audio.wav")
+        audio_output_path = os.path.join(tempfile.gettempdir(), "output_audio.wav")
+        audio_clip.write_audiofile(audio_output_path)
     except Exception as e:
         st.error(f"Error processing video: {e}")
         return
 
-    FILE_URL = "output_audio.wav"
-
     try:
         # Transcribe audio using AssemblyAI
         transcriber = aai.Transcriber()
-        transcript = transcriber.transcribe(FILE_URL)
+        transcript = transcriber.transcribe(audio_output_path)
         transcript_text = transcript.text
 
         if transcript.status == aai.TranscriptStatus.error:
@@ -77,8 +74,8 @@ def final(video_path):
         return
 
     try:
-        # Save transcript to a file
-        transcript_file_path = "transcript.txt"
+        # Save transcript to a temporary file
+        transcript_file_path = os.path.join(tempfile.gettempdir(), "transcript.txt")
         with open(transcript_file_path, 'w') as file:
             file.write(transcript_text)
 
@@ -106,12 +103,13 @@ def final(video_path):
                         "text": prompt
                     }
                 ]
-            }
+            ]
         )
         summary = transcript.text[:100] + response.text.replace("*", "").replace("-", "")
 
-        # Save the summary to a text file
-        with open('summary.txt', 'w', encoding='utf-8') as file:
+        # Save the summary to a temporary file
+        summary_file_path = os.path.join(tempfile.gettempdir(), 'summary.txt')
+        with open(summary_file_path, 'w', encoding='utf-8') as file:
             file.write(summary)
     except Exception as e:
         st.error(f"Error generating summary: {e}")
@@ -120,7 +118,7 @@ def final(video_path):
     def get_audio_duration(file_path):
         try:
             audio = AudioSegment.from_file(file_path)
-            return len(audio) / 1000  # Converting milliseconds to seconds
+            return len(audio) / 1000  # Convert milliseconds to seconds
         except Exception as e:
             st.error(f"Error reading audio file: {e}")
             return 0
@@ -161,30 +159,23 @@ def final(video_path):
 
         return matching_segments
 
-    total_video_duration = get_audio_duration("output_audio.wav")
-    video_transcript = "transcript.txt"
-    summarized_text = "summary.txt"
-    matching_segments = find_segments(video_transcript, summarized_text, total_video_duration)
+    total_video_duration = get_audio_duration(audio_output_path)
+    matching_segments = find_segments(transcript_file_path, summary_file_path, total_video_duration)
     st.write("Matching Segments:", matching_segments)
-
-    for start_time, end_time in matching_segments:
-        st.write(f"Cut video from {start_time} seconds to {end_time} seconds.")
 
     def trim_and_speedup_video(video_path, output_folder, start_time, end_time, speed_factor=1.5):
         try:
-            start_seconds = start_time
-            end_seconds = end_time
-            output_filename = f"clip_{start_seconds}_{end_seconds}_speedup.mp4"  # Include both times in the filename
+            output_filename = f"clip_{start_time}_{end_time}_speedup.mp4"
             output_path = os.path.join(output_folder, output_filename)
 
-            command = f"ffmpeg -i {video_path} -ss {start_seconds} -to {end_seconds} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
+            command = f"ffmpeg -i {video_path} -ss {start_time} -to {end_time} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
             os.system(command)
             st.write(f"Trimmed and sped up video: {output_path}")
         except Exception as e:
             st.error(f"Error trimming video: {e}")
 
-    output_folder = "./output"
-    os.makedirs(output_folder, exist_ok=True)
+    # Create a temporary directory for video output
+    output_folder = tempfile.mkdtemp()
 
     for start_time, end_time in matching_segments:
         start_time = max(0, start_time - 20)
@@ -196,5 +187,3 @@ def final(video_path):
         trim_and_speedup_video(video_path, output_folder, start_time, end_time)
 
     st.write("All video clips trimmed and sped up successfully!")
-
-# Assuming this function is called in your Streamlit app with the uploaded video path
