@@ -14,18 +14,18 @@ model_name = "en_core_web_lg"
 
 # Function to load the spaCy model
 def load_spacy_model():
-    # Create a temporary directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            nlp = spacy.load(model_name)
-        except OSError:
-            # If the model is not found, download and install it in the temp directory
-            spacy.cli.download(model_name, target=temp_dir)
-            os.environ["SPACY_MODEL_PATH"] = temp_dir  # Set environment variable
-            nlp = spacy.load(model_name)  # Load the model after installation
+    model_name = "en_core_web_lg"
+    try:
+        nlp = spacy.load(model_name)  # Try loading the model
+    except OSError:
+        # If the model is not found, download it
+        spacy.cli.download(model_name)  # No need for 'target' argument
+        nlp = spacy.load(model_name)  # Load the model after installation
     return nlp
+
 # Load the spaCy model
 nlp = load_spacy_model()
+
 
 # Access API keys from Streamlit secrets
 GOOGLE_API_KEY = st.secrets["google_api"]["api_key"]
