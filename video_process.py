@@ -7,8 +7,22 @@ from pydub import AudioSegment
 import spacy
 import assemblyai as aai
 import streamlit as st
+import spacy.cli
 
-nlp = spacy.load("en_core_web_lg")
+model_name = "en_core_web_lg"
+
+# Function to load the spaCy model
+def load_spacy_model():
+    try:
+        nlp = spacy.load(model_name)  # Try to load the model
+    except OSError:
+        # If not installed, download and install it
+        spacy.cli.download(model_name)  # Download the model
+        nlp = spacy.load(model_name)  # Load the model after installation
+    return nlp
+
+# Load the spaCy model
+nlp = load_spacy_model()
 
 # Access API keys from Streamlit secrets
 GOOGLE_API_KEY = st.secrets["google_api"]["api_key"]
@@ -157,7 +171,7 @@ def final(video_path):
         try:
             start_seconds = start_time
             end_seconds = end_time
-            output_filename = f"clip_{end_time}_speedup.mp4"
+            output_filename = f"clip_{start_seconds}_{end_seconds}_speedup.mp4"  # Include both times in the filename
             output_path = os.path.join(output_folder, output_filename)
 
             command = f"ffmpeg -i {video_path} -ss {start_seconds} -to {end_seconds} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
@@ -179,3 +193,5 @@ def final(video_path):
         trim_and_speedup_video(video_path, output_folder, start_time, end_time)
 
     st.write("All video clips trimmed and sped up successfully!")
+
+# Assuming this function is called in your Streamlit app with the uploaded video path
