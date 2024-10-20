@@ -1,14 +1,14 @@
 import requests
 import time
+import os
+import tempfile
+import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import google.generativeai as genai
-import os
 from pydub import AudioSegment
 import spacy
 import assemblyai as aai
-import streamlit as st
 import spacy.cli
-import tempfile
 
 model_name = "en_core_web_lg"
 
@@ -47,8 +47,8 @@ def final(video_path):
         generation_config=generation_config,
     )
 
+    # Process the video to extract audio
     try:
-        # Process the video to extract audio
         video_clip = VideoFileClip(video_path)
         audio_clip = video_clip.audio
         audio_output_path = os.path.join(tempfile.gettempdir(), "output_audio.wav")
@@ -57,26 +57,23 @@ def final(video_path):
         st.error(f"Error processing video: {e}")
         return
 
+    # Transcribe audio using AssemblyAI
     try:
-        # Transcribe audio using AssemblyAI
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(audio_output_path)
-        transcript_text = transcript.text
-
         if transcript.status == aai.TranscriptStatus.error:
             st.error(f"Transcription error: {transcript.error}")
             return
-        else:
-            st.write(f"Transcript: {transcript.text}")
+        st.write(f"Transcript: {transcript.text}")
     except Exception as e:
         st.error(f"Error transcribing audio: {e}")
         return
 
+    # Save transcript to a temporary file
     try:
-        # Save transcript to a temporary file
         transcript_file_path = os.path.join(tempfile.gettempdir(), "transcript.txt")
         with open(transcript_file_path, 'w') as file:
-            file.write(transcript_text)
+            file.write(transcript.text)
 
         # Generate summary using Generative AI model
         chat_session = model.start_chat(
@@ -84,36 +81,33 @@ def final(video_path):
                 {
                     "role": "user",
                     "parts": [
-                        {
-                            "text": transcript.text
-                        }
+                        {"text": transcript.text}
                     ]
                 }
             ]
         )
 
-        ad = "\nExtract important sentences from the given video transcript, providing long detailed points with a length of more than 100 words. The extracted points should be suitable for creating concise video shorts."
-        prompt = transcript.text + ad
+        prompt = transcript.text + "\nExtract important sentences from the given video transcript, providing long detailed points with a length of more than 100 words. The extracted points should be suitable for creating concise video shorts."
         response = chat_session.send_message(
             {
                 "role": "user",
                 "parts": [
-                    {
-                        "text": prompt
-                    }
+                    {"text": prompt}
                 ]
             }
         )
-        summary = transcript.text[:100] + response.text.replace("*", "").replace("-", "")
+        summary = response.text.replace("*", "").replace("-", "")
 
         # Save the summary to a temporary file
         summary_file_path = os.path.join(tempfile.gettempdir(), 'summary.txt')
         with open(summary_file_path, 'w', encoding='utf-8') as file:
             file.write(summary)
+
     except Exception as e:
         st.error(f"Error generating summary: {e}")
         return
 
+    # Function to get audio duration
     def get_audio_duration(file_path):
         try:
             audio = AudioSegment.from_file(file_path)
@@ -122,27 +116,22 @@ def final(video_path):
             st.error(f"Error reading audio file: {e}")
             return 0
 
+    # Function to find matching segments
     def find_segments(video_transcript_path, summarized_text_path, total_video_duration):
         try:
-            # Read the video transcript
             with open(video_transcript_path, 'r') as file:
                 video_transcript = file.read()
-
-            # Read the summarized text
             with open(summarized_text_path, 'r') as file:
                 summarized_text = file.read()
         except Exception as e:
             st.error(f"Error reading files: {e}")
             return []
 
-        # Process the texts with spaCy
         doc_transcript = nlp(video_transcript)
         doc_summary = nlp(summarized_text)
 
-        # Initialize an empty list to store matching segments
         matching_segments = []
 
-        # Iterate over sentences in the video transcript
         for sentence in doc_transcript.sents:
             similarity_score = sentence.similarity(doc_summary)
             similarity_threshold = 0.5
@@ -162,6 +151,7 @@ def final(video_path):
     matching_segments = find_segments(transcript_file_path, summary_file_path, total_video_duration)
     st.write("Matching Segments:", matching_segments)
 
+    # Function to trim and speed up video
     def trim_and_speedup_video(video_path, output_folder, start_time, end_time, speed_factor=1.5):
         try:
             output_filename = f"clip_{start_time}_{end_time}_speedup.mp4"
@@ -187,3 +177,11 @@ def final(video_path):
 
     st.write("All video clips trimmed and sped up successfully!")
 
+    # Optional: List output files
+    output_files = os.listdir(output_folder)
+    if output_files:
+        st.info("Here are the processed video clips:")
+        for output_file in output_files:
+            st.write(output_file)
+    else:
+        st.warning("No output files found.")
