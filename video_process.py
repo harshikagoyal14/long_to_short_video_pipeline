@@ -8,6 +8,7 @@ import spacy
 import assemblyai as aai
 import streamlit as st
 import spacy.cli
+import tempfile
 
 model_name = "en_core_web_lg"
 
