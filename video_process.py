@@ -9,7 +9,7 @@ import assemblyai as aai
 import streamlit as st
 
 
-model_name = "en_core_web_lg"
+model_name = "en_core_web_sm"
 try:
     nlp = spacy.load(model_name)
 except OSError:
