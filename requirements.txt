@@ -1,9 +1,11 @@
+--upgrade pip
+spacy==3.8.0
+en-core-web-lg==3.8.0
 streamlit
 requests
 moviepy
 google-generativeai
 pydub
-spacy>=3.0.0,<4.0.0
 python-dotenv
 assemblyai
 ffmpeg-python
