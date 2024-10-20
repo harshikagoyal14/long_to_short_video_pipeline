@@ -4,14 +4,14 @@ from video_process import final
 
 import spacy
 import os
+from spacy.cli import download
 
-model_name = "en_core_web_sm"
+# Check if the model is installed, and install it if not
 try:
-    nlp = spacy.load(model_name)
+    nlp = spacy.load("en_core_web_lg")
 except OSError:
-    os.system(f"python -m spacy download {model_name}")
-    nlp = spacy.load(model_name)
-
+    download("en_core_web_lg")
+    nlp = spacy.load("en_core_web_lg")
 
 if __name__ == "__main__":
     st.title("YouTube Shorts Extractor Web App from long videos")
