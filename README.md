@@ -20,12 +20,11 @@ This web application allows users to upload long video files and extract shorter
 
 Install the required Python libraries listed in the `requirements.txt` file:
 
-    ```bash
+    
     pip install -r requirements.txt
 
 Download the required spaCy model (if not already installed):
-
-    ```bash
+    
     python -m spacy download en_core_web_lg
     
 
@@ -36,14 +35,13 @@ The project requires API keys for Google Generative AI and AssemblyAI. You can d
 Google Generative AI API key: Replace GOOGLE_API_KEY with your Google API key in the final function.
 AssemblyAI API key: Replace ASSEMBLY_API_KEY with your AssemblyAI API key in the final function.
 
-    ```bash
+   
     GOOGLE_API_KEY = "your_google_api_key_here"
     ASSEMBLY_API_KEY = "your_assemblyai_api_key_here"
 ### Usage
 
 Run the app using:
 
-     ```bash
      streamlit run app.py
 
 ### Output 
