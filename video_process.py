@@ -13,14 +13,16 @@ model_name = "en_core_web_lg"
 
 # Function to load the spaCy model
 def load_spacy_model():
-    try:
-        nlp = spacy.load(model_name)  # Try to load the model
-    except OSError:
-        # If not installed, download and install it
-        spacy.cli.download(model_name)  # Download the model
-        nlp = spacy.load(model_name)  # Load the model after installation
+    # Create a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            nlp = spacy.load(model_name)
+        except OSError:
+            # If the model is not found, download and install it in the temp directory
+            spacy.cli.download(model_name, target=temp_dir)
+            os.environ["SPACY_MODEL_PATH"] = temp_dir  # Set environment variable
+            nlp = spacy.load(model_name)  # Load the model after installation
     return nlp
-
 # Load the spaCy model
 nlp = load_spacy_model()
 
