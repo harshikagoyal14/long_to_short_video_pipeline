@@ -8,15 +8,6 @@ import spacy
 import assemblyai as aai
 import streamlit as st
 
-
-model_name = "en_core_web_sm"
-try:
-    nlp = spacy.load(model_name)
-except OSError:
-    os.system(f"python -m spacy download {model_name}")
-    nlp = spacy.load(model_name)
-
-
 nlp = spacy.load("en_core_web_lg")
 
 # Access API keys from Streamlit secrets
