@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 from video_process import final  # This is your `final` function
+import shutil
 
 def remove_temp_files(files):
     """Helper function to remove temporary files."""
@@ -32,11 +33,8 @@ if __name__ == "__main__":
                     st.stop()
 
                 # Create an output folder if it doesn't exist
-                output_folder = "output"
-                if not os.path.exists(output_folder):
-                    os.makedirs(output_folder)
+                output_folder = "/tmp/tmpmeser_1w"  # Use your existing temporary folder here
 
-                # Fetch output files (processed clips)
                 output_files = [f for f in os.listdir(output_folder) if os.path.isfile(os.path.join(output_folder, f))]
 
                 st.info("Here are the processed video clips:")
@@ -45,6 +43,7 @@ if __name__ == "__main__":
                 for output_file in output_files:
                     file_path = os.path.join(output_folder, output_file)
 
+                    # Display video in Streamlit
                     st.video(file_path)
 
                     # Create a download button for each video clip
@@ -60,5 +59,3 @@ if __name__ == "__main__":
 
             # Remove temporary files after processing
             remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
-            # Optionally, remove processed files if they are no longer needed after download
-            remove_temp_files([os.path.join(output_folder, file) for file in output_files])
