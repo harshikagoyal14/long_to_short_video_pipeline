@@ -9,6 +9,7 @@ from pydub import AudioSegment
 import spacy
 import assemblyai as aai
 import spacy.cli
+import shutil  # for cleaning up temporary folders
 
 model_name = "en_core_web_lg"
 
@@ -160,12 +161,15 @@ def final(video_path):
             command = f"ffmpeg -i {video_path} -ss {start_time} -to {end_time} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
             os.system(command)
             st.write(f"Trimmed and sped up video: {output_path}")
+            return output_path  # Return the path of the generated file for download
         except Exception as e:
             st.error(f"Error trimming video: {e}")
+            return None
 
     # Create a temporary directory for video output
     output_folder = tempfile.mkdtemp()
 
+    output_paths = []
     for start_time, end_time in matching_segments:
         start_time = max(0, start_time - 20)
         end_time = end_time + 20
@@ -173,15 +177,25 @@ def final(video_path):
         if end_time - start_time < 60:
             end_time = start_time + 60
 
-        trim_and_speedup_video(video_path, output_folder, start_time, end_time)
+        clip_path = trim_and_speedup_video(video_path, output_folder, start_time, end_time)
+        if clip_path:
+            output_paths.append(clip_path)
 
     st.write("All video clips trimmed and sped up successfully!")
 
-    # Optional: List output files
-    output_files = os.listdir(output_folder)
-    if output_files:
-        st.info("Here are the processed video clips:")
-        for output_file in output_files:
-            st.write(output_file)
+    # Optional: Provide download links for the output files
+    if output_paths:
+        st.info("Here are the processed video clips available for download:")
+        for output_path in output_paths:
+            with open(output_path, "rb") as file:
+                st.download_button(
+                    label=f"Download {os.path.basename(output_path)}",
+                    data=file,
+                    file_name=os.path.basename(output_path),
+                    mime="video/mp4"
+                )
     else:
         st.warning("No output files found.")
+    
+    # Cleanup temporary directory
+    shutil.rmtree(output_folder)
