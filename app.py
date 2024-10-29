@@ -1,6 +1,7 @@
 import os
 import streamlit as st
-from video_process import final  # This is your `final` function
+from video_process import final  # Assuming final is in video_process.py
+import tempfile
 import shutil
 
 def remove_temp_files(files):
@@ -32,30 +33,36 @@ if __name__ == "__main__":
                     remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
                     st.stop()
 
-                # Create an output folder if it doesn't exist
-                output_folder = "/tmp/tmpmeser_1w"  # Use your existing temporary folder here
+                # Dynamically create an output folder using tempfile
+                output_folder = tempfile.mkdtemp()  # This creates a new temp directory
 
                 output_files = [f for f in os.listdir(output_folder) if os.path.isfile(os.path.join(output_folder, f))]
 
-                st.info("Here are the processed video clips:")
+                if output_files:
+                    st.info("Here are the processed video clips:")
 
-                # Display download buttons for each processed video
-                for output_file in output_files:
-                    file_path = os.path.join(output_folder, output_file)
+                    # Display download buttons for each processed video
+                    for output_file in output_files:
+                        file_path = os.path.join(output_folder, output_file)
 
-                    # Display video in Streamlit
-                    st.video(file_path)
+                        # Display video in Streamlit
+                        st.video(file_path)
 
-                    # Create a download button for each video clip
-                    with open(file_path, "rb") as video_file:
-                        st.download_button(
-                            label=f"Download {output_file}",
-                            data=video_file,
-                            file_name=output_file,
-                            mime="video/mp4"
-                        )
+                        # Create a download button for each video clip
+                        with open(file_path, "rb") as video_file:
+                            st.download_button(
+                                label=f"Download {output_file}",
+                                data=video_file,
+                                file_name=output_file,
+                                mime="video/mp4"
+                            )
+                else:
+                    st.warning("No output files found.")
 
                 st.success("Processing complete!")
 
             # Remove temporary files after processing
             remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
+
+            # Cleanup output folder
+            shutil.rmtree(output_folder)
