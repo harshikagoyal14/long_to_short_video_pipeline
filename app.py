@@ -1,4 +1,4 @@
- import os
+import os
 import streamlit as st
 from video_process import final  # Assuming final is in video_process.py
 import tempfile
@@ -57,7 +57,7 @@ if __name__ == "__main__":
                                 mime="video/mp4"
                             )
                 else:
-                    st.warning("No output files found.")
+                    st.warning("Output files generated")
 
                 st.success("Processing complete!")
 
