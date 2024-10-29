@@ -1,6 +1,8 @@
-import os
+ import os
 import streamlit as st
-from video_process import final
+from video_process import final  # Assuming final is in video_process.py
+import tempfile
+import shutil
 
 def remove_temp_files(files):
     """Helper function to remove temporary files."""
@@ -8,7 +10,7 @@ def remove_temp_files(files):
         if os.path.exists(file):
             os.remove(file)
 
-def main():
+if __name__ == "__main__":
     st.title("YouTube Shorts Extractor Web App from Long Videos")
 
     uploaded_file = st.file_uploader("Choose a file", type=["mp4", "avi", "mov"])
@@ -19,34 +21,48 @@ def main():
         if st.button("Process File"):
             with st.spinner("Processing..."):
                 # Save the uploaded file to a temporary location
-                temp_file_path = os.path.join(tempfile.gettempdir(), "input_file.mp4")
+                temp_file_path = "input_file.mp4"
                 with open(temp_file_path, "wb") as temp_file:
                     temp_file.write(uploaded_file.read())
 
                 try:
-                    # Access API keys from Streamlit secrets
-                    google_api_key = st.secrets["google_api"]["api_key"]
-                    assembly_api_key = st.secrets["assembly_ai"]["api_key"]
-
                     # Run the processing function
-                    output_files = final(temp_file_path, google_api_key, assembly_api_key)
-
-                    if output_files:
-                        st.success("Processing complete! Downloading files...")
-                        for output_file in output_files:
-                            with open(output_file, "rb") as file:
-                                st.download_button(
-                                    label=f"Download {os.path.basename(output_file)}",
-                                    data=file,
-                                    file_name=os.path.basename(output_file),
-                                    mime="video/mp4"
-                                )
-                    else:
-                        st.warning("No output files found.")
+                    final(temp_file_path)
                 except Exception as e:
                     st.error(f"An error occurred: {e}")
-                finally:
-                    remove_temp_files([temp_file_path])
+                    remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
+                    st.stop()
 
-if __name__ == "__main__":
-    main()
+                # Dynamically create an output folder using tempfile
+                output_folder = tempfile.mkdtemp()  # This creates a new temp directory
+
+                output_files = [f for f in os.listdir(output_folder) if os.path.isfile(os.path.join(output_folder, f))]
+
+                if output_files:
+                    st.info("Here are the processed video clips:")
+
+                    # Display download buttons for each processed video
+                    for output_file in output_files:
+                        file_path = os.path.join(output_folder, output_file)
+
+                        # Display video in Streamlit
+                        st.video(file_path)
+
+                        # Create a download button for each video clip
+                        with open(file_path, "rb") as video_file:
+                            st.download_button(
+                                label=f"Download {output_file}",
+                                data=video_file,
+                                file_name=output_file,
+                                mime="video/mp4"
+                            )
+                else:
+                    st.warning("No output files found.")
+
+                st.success("Processing complete!")
+
+            # Remove temporary files after processing
+            remove_temp_files([temp_file_path, "output_audio.wav", "transcript.txt"])
+
+            # Cleanup output folder
+            shutil.rmtree(output_folder)
