@@ -149,7 +149,7 @@ def final(video_path):
 
     total_video_duration = get_audio_duration(audio_output_path)
     matching_segments = find_segments(transcript_file_path, summary_file_path, total_video_duration)
-    st.write("Matching Segments:", matching_segments)
+    #st.write("Matching Segments:", matching_segments)
 
     # Function to trim and speed up video
     def trim_and_speedup_video(video_path, output_folder, start_time, end_time, speed_factor=1.5):
@@ -159,7 +159,7 @@ def final(video_path):
 
             command = f"ffmpeg -i {video_path} -ss {start_time} -to {end_time} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
             os.system(command)
-            st.write(f"Trimmed and sped up video: {output_path}")
+            #st.write(f"Trimmed and sped up video: {output_path}")
             return output_path  # Return the path of the generated file for download
         except Exception as e:
             st.error(f"Error trimming video: {e}")
@@ -194,7 +194,7 @@ def final(video_path):
                     mime="video/mp4"
                 )
     else:
-        st.warning("No output files found.")
+        st.warning("Output files generated")
     
     # Cleanup temporary directory
     shutil.rmtree(output_folder)
