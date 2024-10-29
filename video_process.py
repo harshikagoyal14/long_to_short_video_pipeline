@@ -1,12 +1,14 @@
+import time
 import os
 import tempfile
-import shutil
-import requests
-import google.generativeai as genai
-import assemblyai as aai
-import spacy
+import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
+import google.generativeai as genai
 from pydub import AudioSegment
+import spacy
+import assemblyai as aai
+import spacy.cli
+import shutil  # for cleaning up temporary folders
 
 model_name = "en_core_web_lg"
 
@@ -23,10 +25,14 @@ def load_spacy_model():
 # Load the spaCy model
 nlp = load_spacy_model()
 
-def final(video_path, google_api_key, assembly_api_key):
+# Access API keys from Streamlit secrets
+GOOGLE_API_KEY = st.secrets["google_api"]["api_key"]
+ASSEMBLY_API_KEY = st.secrets["assembly_ai"]["api_key"]
+aai.settings.api_key = ASSEMBLY_API_KEY
+
+def final(video_path):
     # Configure Google Generative AI
-    genai.configure(api_key=google_api_key)
-    aai.settings.api_key = assembly_api_key
+    genai.configure(api_key=GOOGLE_API_KEY)
 
     generation_config = {
         "temperature": 1,
@@ -48,62 +54,78 @@ def final(video_path, google_api_key, assembly_api_key):
         audio_output_path = os.path.join(tempfile.gettempdir(), "output_audio.wav")
         audio_clip.write_audiofile(audio_output_path)
     except Exception as e:
-        return f"Error processing video: {e}"
+        st.error(f"Error processing video: {e}")
+        return
 
     # Transcribe audio using AssemblyAI
     try:
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(audio_output_path)
         if transcript.status == aai.TranscriptStatus.error:
-            return f"Transcription error: {transcript.error}"
-        transcript_text = transcript.text
+            st.error(f"Transcription error: {transcript.error}")
+            return
+        st.write(f"Transcript: {transcript.text}")
     except Exception as e:
-        return f"Error transcribing audio: {e}"
+        st.error(f"Error transcribing audio: {e}")
+        return
 
     # Save transcript to a temporary file
-    transcript_file_path = os.path.join(tempfile.gettempdir(), "transcript.txt")
-    with open(transcript_file_path, 'w') as file:
-        file.write(transcript_text)
+    try:
+        transcript_file_path = os.path.join(tempfile.gettempdir(), "transcript.txt")
+        with open(transcript_file_path, 'w') as file:
+            file.write(transcript.text)
 
-    # Generate summary using Generative AI model
-    chat_session = model.start_chat(
-        history=[
+        # Generate summary using Generative AI model
+        chat_session = model.start_chat(
+            history=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": transcript.text}
+                    ]
+                }
+            ]
+        )
+
+        prompt = transcript.text + "\nExtract important sentences from the given video transcript, providing long detailed points with a length of more than 100 words. The extracted points should be suitable for creating concise video shorts."
+        response = chat_session.send_message(
             {
                 "role": "user",
                 "parts": [
-                    {"text": transcript_text}
+                    {"text": prompt}
                 ]
             }
-        ]
-    )
+        )
+        summary = response.text.replace("*", "").replace("-", "")
 
-    prompt = f"{transcript_text}\nExtract important sentences from the given video transcript, providing long detailed points with a length of more than 100 words. The extracted points should be suitable for creating concise video shorts."
-    response = chat_session.send_message(
-        {
-            "role": "user",
-            "parts": [
-                {"text": prompt}
-            ]
-        }
-    )
-    summary = response.text.replace("*", "").replace("-", "")
+        # Save the summary to a temporary file
+        summary_file_path = os.path.join(tempfile.gettempdir(), 'summary.txt')
+        with open(summary_file_path, 'w', encoding='utf-8') as file:
+            file.write(summary)
 
-    # Save the summary to a temporary file
-    summary_file_path = os.path.join(tempfile.gettempdir(), 'summary.txt')
-    with open(summary_file_path, 'w', encoding='utf-8') as file:
-        file.write(summary)
+    except Exception as e:
+        st.error(f"Error generating summary: {e}")
+        return
 
     # Function to get audio duration
     def get_audio_duration(file_path):
-        audio = AudioSegment.from_file(file_path)
-        return len(audio) / 1000  # Convert milliseconds to seconds
+        try:
+            audio = AudioSegment.from_file(file_path)
+            return len(audio) / 1000  # Convert milliseconds to seconds
+        except Exception as e:
+            st.error(f"Error reading audio file: {e}")
+            return 0
 
     # Function to find matching segments
     def find_segments(video_transcript_path, summarized_text_path, total_video_duration):
-        with open(video_transcript_path, 'r') as file:
-            video_transcript = file.read()
-        with open(summarized_text_path, 'r') as file:
-            summarized_text = file.read()
+        try:
+            with open(video_transcript_path, 'r') as file:
+                video_transcript = file.read()
+            with open(summarized_text_path, 'r') as file:
+                summarized_text = file.read()
+        except Exception as e:
+            st.error(f"Error reading files: {e}")
+            return []
 
         doc_transcript = nlp(video_transcript)
         doc_summary = nlp(summarized_text)
@@ -127,15 +149,24 @@ def final(video_path, google_api_key, assembly_api_key):
 
     total_video_duration = get_audio_duration(audio_output_path)
     matching_segments = find_segments(transcript_file_path, summary_file_path, total_video_duration)
+    st.write("Matching Segments:", matching_segments)
 
     # Function to trim and speed up video
-    def trim_and_speedup_video(video_path, start_time, end_time, speed_factor=1.5):
-        output_filename = f"clip_{start_time}_{end_time}_speedup.mp4"
-        output_path = os.path.join(tempfile.gettempdir(), output_filename)
+    def trim_and_speedup_video(video_path, output_folder, start_time, end_time, speed_factor=1.5):
+        try:
+            output_filename = f"clip_{start_time}_{end_time}_speedup.mp4"
+            output_path = os.path.join(output_folder, output_filename)
 
-        command = f"ffmpeg -i {video_path} -ss {start_time} -to {end_time} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
-        os.system(command)
-        return output_path
+            command = f"ffmpeg -i {video_path} -ss {start_time} -to {end_time} -vf 'setpts={1/speed_factor}*PTS' -af 'atempo={speed_factor}' {output_path}"
+            os.system(command)
+            st.write(f"Trimmed and sped up video: {output_path}")
+            return output_path  # Return the path of the generated file for download
+        except Exception as e:
+            st.error(f"Error trimming video: {e}")
+            return None
+
+    # Create a temporary directory for video output
+    output_folder = tempfile.mkdtemp()
 
     output_paths = []
     for start_time, end_time in matching_segments:
@@ -145,8 +176,25 @@ def final(video_path, google_api_key, assembly_api_key):
         if end_time - start_time < 60:
             end_time = start_time + 60
 
-        clip_path = trim_and_speedup_video(video_path, start_time, end_time)
+        clip_path = trim_and_speedup_video(video_path, output_folder, start_time, end_time)
         if clip_path:
             output_paths.append(clip_path)
 
-    return output_paths
+    st.write("All video clips trimmed and sped up successfully!")
+
+    # Optional: Provide download links for the output files
+    if output_paths:
+        st.info("Here are the processed video clips available for download:")
+        for output_path in output_paths:
+            with open(output_path, "rb") as file:
+                st.download_button(
+                    label=f"Download {os.path.basename(output_path)}",
+                    data=file,
+                    file_name=os.path.basename(output_path),
+                    mime="video/mp4"
+                )
+    else:
+        st.warning("No output files found.")
+    
+    # Cleanup temporary directory
+    shutil.rmtree(output_folder)
